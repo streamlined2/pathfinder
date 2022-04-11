@@ -2,15 +2,19 @@ package luxoft.ch.path;
 
 import java.awt.Point;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
-import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 public class Sleuth implements PathFinder {
+
+	private static final Function<Point, Point> POINT_KEY_EXTRACTOR = Function.<Point>identity();
+	private static final Function<Point, Integer> ROW_KEY_EXTRACTOR = (Point p) -> p.y;
 
 	private Board board;
 
@@ -31,7 +35,7 @@ public class Sleuth implements PathFinder {
 		};
 	}
 
-	private List<Advance> makeWave(Advance advance, Set<Advance> inspected) {
+	private List<Advance> makeWave(Advance advance, Map<Point, Advance> inspected) {
 		Point center = advance.to();
 		return Stream
 				.of(getNeighbor(center, Direction.LEFT), getNeighbor(center, Direction.UP),
@@ -40,35 +44,26 @@ public class Sleuth implements PathFinder {
 				.map(candidate -> new Advance(center, candidate, advance.stepCount() + 1)).toList();
 	}
 
-	private boolean isAcceptable(Point candidate, Set<Advance> inspected) {
-		return board.isValid(candidate) && !board.isObstructed(candidate)
-				&& !isAlreadyInspected(candidate, inspected);
+	private boolean isAcceptable(Point candidate, Map<Point, Advance> inspected) {
+		return board.isValid(candidate) && !board.isObstructed(candidate) && !inspected.containsKey(candidate);
 	}
 
-	private boolean isAlreadyInspected(Point candidate, Set<Advance> inspected) {
-		return inspected.stream().map(Advance::to).anyMatch(candidate::equals);
+	private <R> Optional<Point> isTargetReached(List<Advance> wave, R value, Function<Point, R> keyExtractor) {
+		return wave.stream().map(Advance::to).filter(point -> keyExtractor.apply(point).equals(value)).findFirst();
 	}
 
-	private Optional<Point> isTargetReached(List<Advance> wave, Point target) {
-		return wave.stream().map(Advance::to).filter(target::equals).findFirst();
-	}
-
-	private Optional<Point> isTargetReached(List<Advance> wave, int y) {
-		return wave.stream().map(Advance::to).filter(point -> point.y == y).findFirst();
-	}
-
-	private List<Point> findPath(Point start, Point target) {
+	private <R> List<Point> findPath(Point start, R target, Function<Point, R> keyExtractor) {
 		Queue<Advance> toBeInspected = new LinkedList<>();
-		Set<Advance> inspected = new HashSet<>();
+		Map<Point, Advance> inspected = new HashMap<>();
 		toBeInspected.add(new Advance(null, start, 0));
 		do {
 			Advance advance = toBeInspected.poll();
 			if (advance == null) {
 				break;
 			}
-			inspected.add(advance);
+			inspected.put(advance.to(), advance);
 			List<Advance> wave = makeWave(advance, inspected);
-			Optional<Point> targetPoint = isTargetReached(wave, target);
+			Optional<Point> targetPoint = isTargetReached(wave, target, keyExtractor);
 			if (targetPoint.isPresent()) {
 				return constructPath(targetPoint.get(), inspected, wave);
 			}
@@ -77,7 +72,7 @@ public class Sleuth implements PathFinder {
 		return null;
 	}
 
-	private List<Point> constructPath(Point target, Set<Advance> inspected, List<Advance> wave) {
+	private List<Point> constructPath(Point target, Map<Point, Advance> inspected, List<Advance> wave) {
 		List<Point> path = new ArrayList<>();
 		path.add(0, target);
 		Optional<Advance> step = wave.stream().filter(advance -> advance.to().equals(target)).findFirst();
@@ -87,48 +82,21 @@ public class Sleuth implements PathFinder {
 				break;
 			}
 			path.add(0, previous);
-			step = inspected.stream().filter(advance -> advance.to().equals(previous)).findFirst();
+			step = Optional.ofNullable(inspected.get(previous));
 		}
 		return path;
-	}
-
-	private List<Point> findPath(Point start, int targetY) {
-		Queue<Advance> toBeInspected = new LinkedList<>();
-		Set<Advance> inspected = new HashSet<>();
-		toBeInspected.add(new Advance(null, start, 0));
-		do {
-			Advance advance = toBeInspected.poll();
-			if (advance == null) {
-				break;
-			}
-			inspected.add(advance);
-			List<Advance> wave = makeWave(advance, inspected);
-			Optional<Point> targetPoint = isTargetReached(wave, targetY);
-			if (targetPoint.isPresent()) {
-				return constructPath(targetPoint.get(), inspected, wave);
-			}
-			toBeInspected.addAll(wave);
-		} while (!toBeInspected.isEmpty());
-		return null;
 	}
 
 	@Override
 	public List<Point> findPath(int[][] board, int startX, int startY, int destY) {
 		setBoard(new Board(board));
-
-		Point from = new Point(startX, startY);
-
-		return findPath(from, destY);
+		return findPath(new Point(startX, startY), Integer.valueOf(destY), ROW_KEY_EXTRACTOR);
 	}
 
 	@Override
 	public List<Point> findPath(int[][] board, int startX, int startY, int destX, int destY) {
 		setBoard(new Board(board));
-
-		Point from = new Point(startX, startY);
-		Point to = new Point(destX, destY);
-
-		return findPath(from, to);
+		return findPath(new Point(startX, startY), new Point(destX, destY), POINT_KEY_EXTRACTOR);
 	}
 
 	public static void main(String... args) {
@@ -137,13 +105,13 @@ public class Sleuth implements PathFinder {
 
 		Sleuth sleuth = new Sleuth();
 		List<Point> path = sleuth.findPath(board, 2, 0, 4, 4);
-		if (path != null) {
-			System.out.printf("found path: %n%s%n", path);
-		} else {
-			System.out.println(String.format("can't find path"));
-		}
+		printPath(path);
 
 		path = sleuth.findPath(board, 2, 0, 2);
+		printPath(path);
+	}
+
+	private static void printPath(List<Point> path) {
 		if (path != null) {
 			System.out.printf("found path: %n%s%n", path);
 		} else {
