@@ -3,8 +3,8 @@ package luxoft.ch.path;
 import java.awt.Point;
 import java.util.Objects;
 
-public record Advance(Point from, Point to, int stepCount) {
-	
+public record Advance(Point from, Point to, double key) implements Comparable<Advance> {
+
 	@Override
 	public boolean equals(Object o) {
 		if (o instanceof Advance a) {
@@ -21,7 +21,17 @@ public record Advance(Point from, Point to, int stepCount) {
 	@Override
 	public String toString() {
 		return new StringBuilder().append("from=").append(from.toString()).append(",").append("to=")
-				.append(to.toString()).append(",").append("steps=").append(stepCount).toString();
+				.append(to.toString()).toString();
+	}
+
+	@Override
+	public int compareTo(Advance o) {
+		if (key < o.key) {
+			return -1;
+		} else if (key > o.key) {
+			return 1;
+		}
+		return 0;
 	}
 
 }

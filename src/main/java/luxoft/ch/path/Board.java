@@ -32,7 +32,7 @@ public class Board {
 
 	private void checkDimension(int dimension) {
 		if (dimension <= 0) {
-			throw new IllegalArgumentException(String.format("dimension %d should be positive", dimension));
+			throw new IllegalArgumentException("dimension %d should be positive".formatted(dimension));
 		}
 	}
 
@@ -58,8 +58,16 @@ public class Board {
 		return cells[position.y][position.x] == Cell.OBSTACLE;
 	}
 
+	public boolean isObstructed(int y, int x) {
+		return cells[y][x] == Cell.OBSTACLE;
+	}
+
 	public boolean isValid(Point position) {
 		return position.y >= 0 && position.y < cells.length && position.x >= 0 && position.x < cells[position.y].length;
+	}
+
+	public boolean isValid(int y, int x) {
+		return y >= 0 && y < cells.length && x >= 0 && x < cells[y].length;
 	}
 
 	public void print(PrintStream os) {
